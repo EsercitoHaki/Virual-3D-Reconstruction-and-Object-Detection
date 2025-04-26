@@ -1,6 +1,7 @@
 #include "FeatureDetector.h"
 
 #include <thread>
+#include <future>
 #include <iostream>
 
 namespace ImageProcessing {
@@ -14,66 +15,40 @@ namespace ImageProcessing {
     }
 
     void FeatureDetector::detectFeaturesParallel(std::vector<ImageData>& images) {
-        std::vector<std::thread> threads;
-        const int numThreads = std::min(static_cast<int>(images.size()),
-                                        static_cast<int>(std::thread::hardware_concurrency()));
+        unsigned int numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4;
+
+        numThreads = std::min(numThreads, 8u);
+        numThreads = std::min(numThreads, static_cast<unsigned int>(images.size()));
 
         std::cout << "Using " << numThreads << " threads for feature detection" << std::endl;
 
-        std::vector<std::vector<ImageData*>> threadWorkload(numThreads);
+        std::vector<std::future<void>> futures;
 
-        for (size_t i = 0; i < images.size(); i++) {
-            threadWorkload[i % numThreads].push_back(&images[i]);
-        }
-
-        for (int t = 0; t < images.size(); t++) {
-            threads.emplace_back([this, &threadWorkload, t]() {
-                for (auto* imageData : threadWorkload[t]) {
-                    this->detectFeatures(*imageData);
+        for (size_t t = 0; t < numThreads; ++t) {
+            futures.push_back(std::async(std::launch::async, [&, t]() {
+                for (size_t i = t; i < images.size(); i += numThreads) {
+                    detectFeatures(images[i]);
+                    std::cout << "Detected " << images[i].keypoints.size()
+                              << " features in image " << (i + 1) << "/" << images.size()
+                              << ": " << images[i].getPath() << std::endl;
                 }
-            });
+            }));
         }
 
-        for (auto& thread : threads) {
-            thread.join();
+        for (auto& f : futures) {
+            f.wait();
         }
     }
 
     cv::Ptr<cv::Feature2D> FeatureDetector::createDetector(DetectorType type) {
         switch (type) {
             case DetectorType::SIFT:
-                return cv::SIFT::create(
-                    0,      // nfeatures (0 = no limit)
-                    3,      // nOctaveLayers
-                    0.04,   // contrastThreshold
-                    10,     // edgeThreshold
-                    1.6     // sigma
-                );
-            
+                return cv::SIFT::create();
             case DetectorType::AKAZE:
-                return cv::AKAZE::create(
-                    cv::AKAZE::DESCRIPTOR_MLDB,   // descriptor_type
-                    0,                           // descriptor_size
-                    0,                           // descriptor_channels
-                    0.001f,                      // threshold
-                    4,                           // octaves
-                    4,                           // octave_layers
-                    cv::KAZE::DIFF_PM_G2         // diffusivity
-                );
-                
+                return cv::AKAZE::create();
             case DetectorType::ORB:
-                return cv::ORB::create(
-                    2000,                      // nfeatures
-                    1.2f,                      // scaleFactor
-                    8,                         // nlevels
-                    31,                        // edgeThreshold
-                    0,                         // firstLevel
-                    2,                         // WTA_K
-                    cv::ORB::HARRIS_SCORE,     // scoreType
-                    31,                        // patchSize
-                    20                         // fastThreshold
-                );
-                
+                return cv::ORB::create(2000);
             default:
                 return cv::SIFT::create();
         }

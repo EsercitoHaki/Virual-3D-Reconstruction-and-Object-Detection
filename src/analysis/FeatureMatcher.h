@@ -13,7 +13,9 @@ namespace ImageProcessing {
 
         size_t getMatchCount() const { return matches.size(); }
 
-        bool isValid(size_t minMatches = 20) const { return matches.size() >= minMatches; }
+        bool isValid(size_t minMatches = 20) const { 
+            return matches.size() >= minMatches && !fundamentalMatrix.empty(); 
+        }
     };
 
     class FeatureMatcher {
@@ -30,7 +32,14 @@ namespace ImageProcessing {
 
         private:
             cv::Ptr<cv::DescriptorMatcher> matcher;
+            int currentDescriptorType = -1;
             float ratioTestThreshold = 0.75f;
             int maxMatches = 500;
+
+            cv::Mat computeFundamentalMatrix(
+                const std::vector<cv::KeyPoint>& keypoints1,
+                const std::vector<cv::KeyPoint>& keypoints2,
+                const std::vector<cv::DMatch>& matches,
+                std::vector<cv::DMatch>& inlierMatches);
     };
 }

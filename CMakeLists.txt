@@ -21,8 +21,6 @@ set(SOURCES
     ${RENDERER_DIR}/Visualizer.cpp
     ${RECONSTRUCTION_DIR}/Exporter.cpp
     ${TOOLS_DIR}/ImageProcessor.cpp
-    # Các file khác như feature_detector.cpp, feature_matcher.cpp, exporter.cpp, visualizer.cpp, image_processor.cpp...
-    # hiện tại chưa thấy, khi nào có thì thêm
 )
 
 add_executable(Reconstruction ${SOURCES})

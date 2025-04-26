@@ -18,6 +18,11 @@ namespace Tools {
         
         auto imageExtensions = getSupportedImageExtensions();
         
+        if (!fs::exists(imageDir) || !fs::is_directory(imageDir)) {
+            std::cerr << "Error: Invalid direcroty path: " << imageDir << std::endl;
+            return images;
+        }
+
         std::vector<std::string> imagePaths;
         for (const auto& entry : fs::directory_iterator(imageDir)) {
             if (entry.is_regular_file()) {
@@ -36,11 +41,15 @@ namespace Tools {
             imagePaths.resize(maxImages);
         }
         
+        images.reserve(imagePaths.size());
         for (const auto& path : imagePaths) {
             ImageProcessing::ImageData imageData;
             if (imageData.loadImage(path)) {
                 imageData.preprocess(maxImageSize);
                 images.push_back(imageData);
+            }
+            else {
+                std::cerr << "Warning: Failed to load image: " << path << std::endl;
             }
         }
         

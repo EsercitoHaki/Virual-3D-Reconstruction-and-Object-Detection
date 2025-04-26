@@ -19,6 +19,10 @@ class Exporter {
         std::string getOutputFilePath() const;
 
     private:
+        void exportCameraPositionsPLY(
+            const std::vector<ImageProcessing::ImageData>& images,
+            const std::vector<ImageProcessing::MatchData>& matches,
+            size_t minMatches);
         std::string outputDir;
         std::string outputFile;
     };
