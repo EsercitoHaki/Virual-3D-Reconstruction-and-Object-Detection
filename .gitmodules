@@ -1,3 +1,6 @@
 [submodule "libs/opencv"]
 	path = libs/opencv
 	url = https://github.com/opencv/opencv.git
+[submodule "libs/openMVS"]
+	path = libs/openMVS
+	url = https://github.com/cdcseacave/openMVS.git

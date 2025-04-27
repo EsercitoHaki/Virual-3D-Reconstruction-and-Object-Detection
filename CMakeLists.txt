@@ -12,6 +12,7 @@ set(RECONSTRUCTION_DIR ${SRC_DIR}/reconstruction)
 set(RENDERER_DIR ${SRC_DIR}/renderer)
 set(TOOLS_DIR ${SRC_DIR}/tools)
 set(UI_DIR ${SRC_DIR}/ui)
+set(SFM_DIR ${SRC_DIR}/sfm)
 
 set(SOURCES
     ${SRC_DIR}/main.cpp
@@ -21,6 +22,10 @@ set(SOURCES
     ${RENDERER_DIR}/Visualizer.cpp
     ${RECONSTRUCTION_DIR}/Exporter.cpp
     ${TOOLS_DIR}/ImageProcessor.cpp
+    ${SFM_DIR}/CameraModel.cpp
+    ${SFM_DIR}/PoseEstimator.cpp
+    ${SFM_DIR}/Triangulator.cpp
+    ${SFM_DIR}/Sfm.cpp
 )
 
 add_executable(Reconstruction ${SOURCES})

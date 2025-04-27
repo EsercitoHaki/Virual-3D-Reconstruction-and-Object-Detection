@@ -4,6 +4,7 @@
 #include "renderer/Visualizer.h"
 #include "reconstruction/Exporter.h"
 #include "tools/ImageProcessor.h"
+#include "sfm/Sfm.h"
 
 #include <iostream>
 #include <chrono>
@@ -14,7 +15,7 @@
 namespace fs = std::filesystem;
 
 void printUsage() {
-    std::cout << "Usage: ./FeatureMatching <image_directory> [max_images] [options]" << std::endl;
+    std::cout << "Usage: ./3DReconstruction <image_directory> [max_images] [options]" << std::endl;
     std::cout << "Options:" << std::endl;
     std::cout << "  --detector=<type>  : Feature detector type (SIFT, AKAZE, ORB), default: SIFT" << std::endl;
     std::cout << "  --match=<type>     : Matching strategy (sequential, all), default: sequential" << std::endl;
@@ -41,6 +42,7 @@ int main(int argc, char** argv) {
     int neighborCount = 2;
     int minMatches = 20;
     int numThreads = 4;
+    bool generateVisualization = true;
     
     ImageProcessing::FeatureDetector::DetectorType detectorType = 
         ImageProcessing::FeatureDetector::DetectorType::SIFT;
@@ -48,7 +50,10 @@ int main(int argc, char** argv) {
     for (int i = 2; i < argc; i++) {
         std::string arg = argv[i];
         
-        if (arg.find("--detector=") == 0) {
+        if (arg == "--help") {
+            printUsage();
+            return 0;
+        } else if (arg.find("--detector=") == 0) {
             std::string type = arg.substr(11);
             if (type == "SIFT") {
                 detectorType = ImageProcessing::FeatureDetector::DetectorType::SIFT;
@@ -94,6 +99,8 @@ int main(int argc, char** argv) {
                 std::cerr << "Error: Invalid thread count: " << arg.substr(10) << std::endl;
                 return -1;
             }
+        } else if (arg == "--no-vis") {
+            generateVisualization = false;
         } else if (i == 2 && arg.find("--") != 0) {
             try {
                 maxImages = std::stoi(arg);
@@ -104,7 +111,11 @@ int main(int argc, char** argv) {
         }
     }
     
-    std::cout << "3D Reconstruction Feature Matching" << std::endl;
+    // Start timing
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Print configuration
+    std::cout << "3D Reconstruction" << std::endl;
     std::cout << "--------------------------------" << std::endl;
     std::cout << "Image directory: " << imageDir << std::endl;
     std::cout << "Output directory: " << outputDir << std::endl;
@@ -113,13 +124,15 @@ int main(int argc, char** argv) {
     std::cout << "Neighbor count: " << neighborCount << std::endl;
     std::cout << "Minimum matches: " << minMatches << std::endl;
     std::cout << "Thread count: " << numThreads << std::endl;
-    std::cout << "Feature detector: " << (detectorType == ImageProcessing::FeatureDetector::DetectorType::SIFT ? "SIFT" : 
-                                         (detectorType == ImageProcessing::FeatureDetector::DetectorType::AKAZE ? "AKAZE" : "ORB")) << std::endl;
+    std::cout << "Feature detector: " 
+              << (detectorType == ImageProcessing::FeatureDetector::DetectorType::SIFT ? "SIFT" : 
+                  (detectorType == ImageProcessing::FeatureDetector::DetectorType::AKAZE ? "AKAZE" : "ORB")) 
+              << std::endl;
     std::cout << "Matching strategy: " << (matchSequential ? "Sequential" : "All pairs") << std::endl;
+    std::cout << "Visualization: " << (generateVisualization ? "Enabled" : "Disabled") << std::endl;
     std::cout << "--------------------------------" << std::endl;
     
-    auto startTime = std::chrono::high_resolution_clock::now();
-    
+    // Image processing
     Tools::ImageProcessor processor(maxImageSize);
     
     std::cout << "Loading images from: " << imageDir << std::endl;
@@ -137,14 +150,35 @@ int main(int argc, char** argv) {
     
     std::cout << "Processing completed. Found " << matches.size() << " matching image pairs" << std::endl;
     
-    std::cout << "Generating visualizations..." << std::endl;
-    Rendering::Visualizer visualizer(outputDir);
-    visualizer.visualizeAllMatches(images, matches, minMatches);
+    // Visualization
+    if (generateVisualization) {
+        std::cout << "Generating visualizations..." << std::endl;
+        Rendering::Visualizer visualizer(outputDir);
+        visualizer.visualizeAllMatches(images, matches, minMatches);
+    }
     
+    // Reconstruction
+    std::cout << "Starting 3D Reconstruction..." << std::endl;
+    SFM::CameraModel cameraModel = SFM::CameraModel::estimateFromImageSize(
+        images[0].getImage().cols, 
+        images[0].getImage().rows
+    );
+    
+    SFM::SfMReconstructor reconstructor(images, matches, cameraModel);
+    
+    if (!reconstructor.reconstruct()) {
+        std::cerr << "3D Reconstruction failed" << std::endl;
+        return -1;
+    }
+    
+    std::cout << "3D Reconstruction completed successfully" << std::endl;
+    
+    // Export reconstruction data
     std::cout << "Exporting reconstruction data..." << std::endl;
     Reconstruction::Exporter exporter(outputDir);
     exporter.exportMatchesForReconstruction(images, matches, minMatches);
     
+    // End timing and report
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsedTime = endTime - startTime;
     

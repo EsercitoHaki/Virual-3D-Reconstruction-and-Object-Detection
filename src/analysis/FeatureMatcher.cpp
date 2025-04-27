@@ -24,23 +24,19 @@ namespace ImageProcessing {
         std::vector<cv::DMatch>& inlierMatches) {
         
         if (matches.size() < 8) {
-            // Need at least 8 points to compute fundamental matrix
             inlierMatches = matches;
             return cv::Mat();
         }
         
-        // Extract matching points
         std::vector<cv::Point2f> points1, points2;
         for (const auto& match : matches) {
             points1.push_back(keypoints1[match.queryIdx].pt);
             points2.push_back(keypoints2[match.trainIdx].pt);
         }
         
-        // Use RANSAC to compute fundamental matrix and find inliers
         std::vector<uchar> inliersMask;
         cv::Mat F = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC, 3.0, 0.99, inliersMask);
         
-        // Keep only inlier matches
         inlierMatches.clear();
         for (size_t i = 0; i < inliersMask.size(); i++) {
             if (inliersMask[i]) {
