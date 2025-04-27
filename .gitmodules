@@ -4,3 +4,9 @@
 [submodule "libs/openMVS"]
 	path = libs/openMVS
 	url = https://github.com/cdcseacave/openMVS.git
+[submodule "libs/pcl"]
+	path = libs/pcl
+	url = https://github.com/PointCloudLibrary/pcl.git
+[submodule "libs/libigl"]
+	path = libs/libigl
+	url = https://github.com/libigl/libigl.git

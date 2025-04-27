@@ -25,6 +25,10 @@ namespace SFM {
             bool savePoses(const std::string& filename) const;
             bool savePointCloud(const std::string& filename) const;
 
+            const Triangulator& getTriangulator() const {
+                return triangulator;
+            }
+
         private:
             const ImageProcessing::MatchData* findMatchBetweenImages(
                 size_t imageIdx1, size_t imageIdx2) const;

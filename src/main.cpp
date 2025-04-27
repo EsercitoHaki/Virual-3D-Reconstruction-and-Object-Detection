@@ -4,6 +4,7 @@
 #include "renderer/Visualizer.h"
 #include "reconstruction/Exporter.h"
 #include "tools/ImageProcessor.h"
+#include "surface/IglReconstruction.h"
 #include "sfm/Sfm.h"
 
 #include <iostream>
@@ -111,10 +112,8 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Start timing
     auto startTime = std::chrono::high_resolution_clock::now();
     
-    // Print configuration
     std::cout << "3D Reconstruction" << std::endl;
     std::cout << "--------------------------------" << std::endl;
     std::cout << "Image directory: " << imageDir << std::endl;
@@ -132,7 +131,6 @@ int main(int argc, char** argv) {
     std::cout << "Visualization: " << (generateVisualization ? "Enabled" : "Disabled") << std::endl;
     std::cout << "--------------------------------" << std::endl;
     
-    // Image processing
     Tools::ImageProcessor processor(maxImageSize);
     
     std::cout << "Loading images from: " << imageDir << std::endl;
@@ -150,14 +148,12 @@ int main(int argc, char** argv) {
     
     std::cout << "Processing completed. Found " << matches.size() << " matching image pairs" << std::endl;
     
-    // Visualization
     if (generateVisualization) {
         std::cout << "Generating visualizations..." << std::endl;
         Rendering::Visualizer visualizer(outputDir);
         visualizer.visualizeAllMatches(images, matches, minMatches);
     }
     
-    // Reconstruction
     std::cout << "Starting 3D Reconstruction..." << std::endl;
     SFM::CameraModel cameraModel = SFM::CameraModel::estimateFromImageSize(
         images[0].getImage().cols, 
@@ -166,19 +162,70 @@ int main(int argc, char** argv) {
     
     SFM::SfMReconstructor reconstructor(images, matches, cameraModel);
     
-    if (!reconstructor.reconstruct()) {
-        std::cerr << "3D Reconstruction failed" << std::endl;
-        return -1;
-    }
-    
-    std::cout << "3D Reconstruction completed successfully" << std::endl;
-    
-    // Export reconstruction data
-    std::cout << "Exporting reconstruction data..." << std::endl;
+    std::cout << "Creating mesh from point cloud..." << std::endl;
+    Surface::IglReconstruction mesher(Surface::IglReconstruction::MARCHING_CUBES);
+    mesher.setGridResolution(64);
+    mesher.setIsoLevel(0.01);
+
+    const auto& points = reconstructor.getTriangulator().getPoints();
+    Surface::Mesh mesh = mesher.reconstruct(points);
+
+    std::cout << "Xuất mesh..." << std::endl;
     Reconstruction::Exporter exporter(outputDir);
-    exporter.exportMatchesForReconstruction(images, matches, minMatches);
-    
-    // End timing and report
+
+    exporter.exportMeshToOBJ(mesh, "reconstructed_surface.obj");
+    exporter.exportMeshToPLY(mesh, "reconstructed_surface.ply");
+    exporter.exportMeshToSTL(mesh, "reconstructed_surface.stl");
+
+    std::cout << "Đã xuất mesh sang các định dạng: OBJ, PLY, STL" << std::endl;
+    std::cout << "Thông tin Mesh:" << std::endl;
+    std::cout << "Số đỉnh: " << mesh.getVertices().size() << std::endl;
+    std::cout << "Số tam giác: " << mesh.getTriangles().size() << std::endl;
+
+    if (!mesh.getVertices().empty()) {
+        float minX = std::numeric_limits<float>::max();
+        float maxX = std::numeric_limits<float>::lowest();
+        float minY = std::numeric_limits<float>::max();
+        float maxY = std::numeric_limits<float>::lowest();
+        float minZ = std::numeric_limits<float>::max();
+        float maxZ = std::numeric_limits<float>::lowest();
+
+        for (const auto& vertex : mesh.getVertices()) {
+            minX = std::min(minX, vertex.position.x);
+            maxX = std::max(maxX, vertex.position.x);
+            minY = std::min(minY, vertex.position.y);
+            maxY = std::max(maxY, vertex.position.y);
+            minZ = std::min(minZ, vertex.position.z);
+            maxZ = std::max(maxZ, vertex.position.z);
+        }
+
+        std::cout << "Bounding Box:" << std::endl;
+        std::cout << "  X: " << minX << " -> " << maxX << std::endl;
+        std::cout << "  Y: " << minY << " -> " << maxY << std::endl;
+        std::cout << "  Z: " << minZ << " -> " << maxZ << std::endl;
+    }
+
+    // if (points.empty()) {
+    //     std::cerr << "Không thể tạo point cloud. Các nguyên nhân có thể:" << std::endl;
+    //     std::cerr << "1. Không đủ ảnh để matching" << std::endl;
+    //     std::cerr << "2. Số lượng matches không đủ" << std::endl;
+    //     std::cerr << "3. Cài đặt matching hoặc reconstruction không phù hợp" << std::endl;
+    // }
+
+    for (const auto& match : matches) {
+        std::cout << "Image pair " << match.imageIdx1 << " and " << match.imageIdx2 
+                  << " - Match point: " << match.matches.size() 
+                  << " - Fundamental Matrix:\n";
+        
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                std::cout << match.fundamentalMatrix.at<double>(i, j) << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+    exporter.exportPointCloudToPLY(points, "point_cloud.ply");
+
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsedTime = endTime - startTime;
     
